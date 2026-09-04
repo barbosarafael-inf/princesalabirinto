@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Princesa Maria Cecília e o Labirinto Encantado</title>
+<style>
+  * {
+    box-sizing: border-box;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #14142b;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fff;
+    touch-action: manipulation;
+  }
+  #app-layout {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100vw;
+    height: 100vh;
+    padding: 4px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  h1 {
+    margin: 2px 0;
+    font-size: 15px;
+    text-align: center;
+    color: #ffd700;
+    text-shadow: 0 0 8px rgba(255,215,0,0.5);
+    flex-shrink: 0;
+  }
+  #hud {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    max-width: 480px;
+    margin: 2px 0 2px;
+    font-size: 13px;
+    font-weight: bold;
+    background: rgba(255,255,255,0.1);
+    padding: 3px 10px;
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.15);
+    flex-shrink: 0;
+  }
+  #game-container {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+  }
+  canvas {
+    background: #2a2a4e;
+    border: 3px solid #ffd700;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(255,215,0,0.3);
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  /* Controles Repulsionados Mais para Cima */
+  #controls {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+    margin-top: -15px;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+  .dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 40px);
+    grid-template-rows: repeat(3, 40px);
+    gap: 3px;
+  }
+  .btn {
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    color: white;
+    font-size: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    touch-action: manipulation;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+  .btn:active, .btn.active {
+    background: #ffd700;
+    color: #14142b;
+  }
+  #btn-up { grid-column: 2; grid-row: 1; }
+  #btn-left { grid-column: 1; grid-row: 2; }
+  #btn-right { grid-column: 3; grid-row: 2; }
+  #btn-down { grid-column: 2; grid-row: 3; }
+
+  .action-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+  }
+  .btn-shoot {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff4081, #e91e63);
+    border: 3px solid #fff;
+    font-size: 24px;
+    box-shadow: 0 4px 12px rgba(233, 30, 99, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+  }
+  .btn-shoot:active {
+    transform: scale(0.92);
+    background: #c2185b;
+  }
+  .btn-start {
+    padding: 5px 12px;
+    border-radius: 14px;
+    background: #00e676;
+    color: #000;
+    font-weight: bold;
+    font-size: 12px;
+    border: none;
+    box-shadow: 0 3px 8px rgba(0, 230, 118, 0.4);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="app-layout">
+  <h1>👸 Maria Cecília & O Labirinto 🏰</h1>
+
+  <div id="hud">
+    <div id="phaseDisplay">Fase: 1/10</div>
+    <div id="livesDisplay">❤️ 3</div>
+    <div id="enemiesDisplay">👾 0</div>
+  </div>
+
+  <div id="game-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+  </div>
+
+  <div id="controls">
+    <div class="dpad">
+      <div class="btn" id="btn-up">⬆️</div>
+      <div class="btn" id="btn-left">⬅️</div>
+      <div class="btn" id="btn-right">➡️</div>
+      <div class="btn" id="btn-down">⬇️</div>
+    </div>
+
+    <div class="action-container">
+      <button class="btn btn-shoot" id="btn-shoot">✨</button>
+      <button class="btn-start" id="btn-action">START / R</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const phaseDisplay = document.getElementById('phaseDisplay');
+const livesDisplay = document.getElementById('livesDisplay');
+const enemiesDisplay = document.getElementById('enemiesDisplay');
+
+const CANVAS_W = canvas.width;
+const CANVAS_H = canvas.height;
+const MAX_PHASE = 10;
+
+const STATE = { MENU: 'menu', PLAYING: 'playing', GAMEOVER: 'gameover', WIN: 'win' };
+let state = STATE.MENU;
+
+let currentPhase = 1;
+let maze = null;
+let player = null;
+let enemies = [];
+let hearts = [];
+let projectiles = [];
+let castle = { x: 0, y: 0 };
+
+const keys = {};
+
+// Teclado
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
+  if (k === 'enter' && state === STATE.MENU) startGame();
+  if (k === 'r' && (state === STATE.GAMEOVER || state === STATE.WIN)) state = STATE.MENU;
+});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+// Touch Controls com Suporte Multi-touch e Prevenção de Gestos
+function bindTouch(id, keyName) {
+  const el = document.getElementById(id);
+  const start = (e) => {
+    if (e.cancelable) e.preventDefault();
+    keys[keyName] = true;
+    el.classList.add('active');
+  };
+  const end = (e) => {
+    if (e.cancelable) e.preventDefault();
+    keys[keyName] = false;
+    el.classList.remove('active');
+  };
+  
+  el.addEventListener('touchstart', start, { passive: false });
+  el.addEventListener('touchend', end, { passive: false });
+  el.addEventListener('touchcancel', end, { passive: false });
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', end);
+}
+
+bindTouch('btn-up', 'arrowup');
+bindTouch('btn-down', 'arrowdown');
+bindTouch('btn-left', 'arrowleft');
+bindTouch('btn-right', 'arrowright');
+bindTouch('btn-shoot', ' ');
+
+document.getElementById('btn-action').addEventListener('click', (e) => {
+  e.preventDefault();
+  if (state === STATE.MENU) startGame();
+  else if (state === STATE.GAMEOVER || state === STATE.WIN) state = STATE.MENU;
+});
+
+canvas.addEventListener('click', () => { if (state === STATE.MENU) startGame(); });
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function generateMaze(cellCols, cellRows) {
+  const cells = [];
+  for (let y = 0; y < cellRows; y++) {
+    cells.push([]);
+    for (let x = 0; x < cellCols; x++) {
+      cells[y].push({ visited: false, walls: { top: true, right: true, bottom: true, left: true } });
+    }
+  }
+
+  const stack = [{ x: 0, y: 0 }];
+  cells[0][0].visited = true;
+  const opposite = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
+
+  while (stack.length) {
+    const current = stack[stack.length - 1];
+    const { x, y } = current;
+    const neighbors = [];
+    if (y > 0 && !cells[y - 1][x].visited) neighbors.push({ x, y: y - 1, dir: 'top' });
+    if (x < cellCols - 1 && !cells[y][x + 1].visited) neighbors.push({ x: x + 1, y, dir: 'right' });
+    if (y < cellRows - 1 && !cells[y + 1][x].visited) neighbors.push({ x, y: y + 1, dir: 'bottom' });
+    if (x > 0 && !cells[y][x - 1].visited) neighbors.push({ x: x - 1, y, dir: 'left' });
+
+    if (neighbors.length === 0) { stack.pop(); continue; }
+
+    const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+    cells[y][x].walls[next.dir] = false;
+    cells[next.y][next.x].walls[opposite[next.dir]] = false;
+    cells[next.y][next.x].visited = true;
+    stack.push({ x: next.x, y: next.y });
+  }
+
+  const tCols = cellCols * 2 + 1;
+  const tRows = cellRows * 2 + 1;
+  const grid = [];
+  for (let i = 0; i < tRows; i++) grid.push(new Array(tCols).fill(1));
+
+  for (let y = 0; y < cellRows; y++) {
+    for (let x = 0; x < cellCols; x++) {
+      const tx = x * 2 + 1, ty = y * 2 + 1;
+      grid[ty][tx] = 0;
+      if (!cells[y][x].walls.top) grid[ty - 1][tx] = 0;
+      if (!cells[y][x].walls.bottom) grid[ty + 1][tx] = 0;
+      if (!cells[y][x].walls.left) grid[ty][tx - 1] = 0;
+      if (!cells[y][x].walls.right) grid[ty][tx + 1] = 0;
+    }
+  }
+  return { cols: tCols, rows: tRows, grid };
+}
+
+function bfsDistances(start) {
+  const dist = [];
+  for (let y = 0; y < maze.rows; y++) dist.push(new Array(maze.cols).fill(undefined));
+  const queue = [start];
+  dist[start.ty][start.tx] = 0;
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const [dx, dy] of dirs) {
+      const nx = cur.tx + dx, ny = cur.ty + dy;
+      if (nx >= 0 && ny >= 0 && nx < maze.cols && ny < maze.rows &&
+          maze.grid[ny][nx] === 0 && dist[ny][nx] === undefined) {
+        dist[ny][nx] = dist[cur.ty][cur.tx] + 1;
+        queue.push({ tx: nx, ty: ny });
+      }
+    }
+  }
+  return dist;
+}
+
+function collidesWithWalls(cx, cy, size) {
+  const half = size / 2;
+  const corners = [
+    [cx - half, cy - half], [cx + half, cy - half],
+    [cx - half, cy + half], [cx + half, cy + half]
+  ];
+  const ts = maze.tileSize;
+  for (const [px, py] of corners) {
+    const tx = Math.floor(px / ts);
+    const ty = Math.floor(py / ts);
+    if (tx < 0 || ty < 0 || tx >= maze.cols || ty >= maze.rows) return true;
+    if (maze.grid[ty][tx] === 1) return true;
+  }
+  return false;
+}
+
+function createEnemy(tile, type, phase) {
+  const size = maze.tileSize * 0.65;
+  return {
+    type,
+    x: tile.tx * maze.tileSize + maze.tileSize / 2,
+    y: tile.ty * maze.tileSize + maze.tileSize / 2,
+    size,
+    speed: type === 'ghost' ? (1.1 + phase * 0.05) : (0.8 + phase * 0.03),
+    dirX: 0, dirY: 0,
+    changeDirTimer: 0,
+    alive: true
+  };
+}
+
+function startPhase(phase, resetLives = false) {
+  const cellCols = 5 + Math.floor(phase * 0.9);
+  const cellRows = 4 + Math.floor(phase * 0.7);
+  const m = generateMaze(cellCols, cellRows);
+  const tileSize = Math.floor(Math.min(CANVAS_W / m.cols, CANVAS_H / m.rows));
+  maze = { cols: m.cols, rows: m.rows, grid: m.grid, tileSize };
+
+  const floorTiles = [];
+  for (let ty = 0; ty < maze.rows; ty++)
+    for (let tx = 0; tx < maze.cols; tx++)
+      if (maze.grid[ty][tx] === 0) floorTiles.push({ tx, ty });
+
+  const startTile = { tx: 1, ty: 1 };
+  const dist = bfsDistances(startTile);
+
+  let farthest = startTile, maxD = -1;
+  for (const t of floorTiles) {
+    const d = dist[t.ty][t.tx];
+    if (d !== undefined && d > maxD) { maxD = d; farthest = t; }
+  }
+
+  castle.x = farthest.tx * maze.tileSize + maze.tileSize / 2;
+  castle.y = farthest.ty * maze.tileSize + maze.tileSize / 2;
+
+  const prevLives = player ? player.lives : 3;
+  player = {
+    x: startTile.tx * maze.tileSize + maze.tileSize / 2,
+    y: startTile.ty * maze.tileSize + maze.tileSize / 2,
+    size: maze.tileSize * 0.7,
+    speed: 2.4,
+    dir: 'down',
+    lives: resetLives ? 3 : prevLives,
+    maxLives: 5,
+    invuln: 0,
+    shootCooldown: 0
+  };
+
+  const usable = floorTiles.filter((t) => {
+    const d = dist[t.ty][t.tx];
+    return d !== undefined && d > 2 && !(t.tx === farthest.tx && t.ty === farthest.ty);
+  });
+  shuffleArray(usable);
+
+  enemies = [];
+  const numGhosts = 2 + Math.floor(phase / 2);
+  const numGators = 1 + Math.floor(phase / 3);
+  let idx = 0;
+  for (let i = 0; i < numGhosts && idx < usable.length; i++, idx++) {
+    enemies.push(createEnemy(usable[idx], 'ghost', phase));
+  }
+  for (let i = 0; i < numGators && idx < usable.length; i++, idx++) {
+    enemies.push(createEnemy(usable[idx], 'gator', phase));
+  }
+
+  hearts = [];
+  const numHearts = (phase % 2 === 0) ? 2 : 1;
+  for (let i = 0; i < numHearts && idx < usable.length; i++, idx++) {
+    hearts.push({
+      x: usable[idx].tx * maze.tileSize + maze.tileSize / 2,
+      y: usable[idx].ty * maze.tileSize + maze.tileSize / 2
+    });
+  }
+
+  projectiles = [];
+}
+
+function startGame() {
+  currentPhase = 1;
+  player = null;
+  startPhase(1, true);
+  state = STATE.PLAYING;
+}
+
+function shoot() {
+  const dirs = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const [dx, dy] = dirs[player.dir];
+  projectiles.push({ x: player.x, y: player.y, dx, dy, speed: 6, size: 8 });
+}
+
+function updatePlayer() {
+  let dx = 0, dy = 0;
+  if (keys['arrowup'] || keys['w']) { dy = -1; player.dir = 'up'; }
+  if (keys['arrowdown'] || keys['s']) { dy = 1; player.dir = 'down'; }
+  if (keys['arrowleft'] || keys['a']) { dx = -1; player.dir = 'left'; }
+  if (keys['arrowright'] || keys['d']) { dx = 1; player.dir = 'right'; }
+
+  if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
+
+  const nx = player.x + dx * player.speed;
+  const ny = player.y + dy * player.speed;
+  if (!collidesWithWalls(nx, player.y, player.size)) player.x = nx;
+  if (!collidesWithWalls(player.x, ny, player.size)) player.y = ny;
+
+  if (player.invuln > 0) player.invuln--;
+  if (player.shootCooldown > 0) player.shootCooldown--;
+
+  if (keys[' '] && player.shootCooldown <= 0) {
+    shoot();
+    player.shootCooldown = 18;
+  }
+}
+
+function updateGhost(g) {
+  g.changeDirTimer--;
+  if (g.changeDirTimer <= 0) {
+    const angle = Math.random() * Math.PI * 2;
+    g.dirX = Math.cos(angle);
+    g.dirY = Math.sin(angle);
+    g.changeDirTimer = 60 + Math.random() * 60;
+  }
+  g.x += g.dirX * g.speed;
+  g.y += g.dirY * g.speed;
+  g.x = Math.max(g.size / 2, Math.min(CANVAS_W - g.size / 2, g.x));
+  g.y = Math.max(g.size / 2, Math.min(CANVAS_H - g.size / 2, g.y));
+}
+
+function updateGator(g) {
+  if (g.dirX === 0 && g.dirY === 0) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const d = dirs[Math.floor(Math.random() * 4)];
+    g.dirX = d[0]; g.dirY = d[1];
+  }
+  const nx = g.x + g.dirX * g.speed;
+  const ny = g.y + g.dirY * g.speed;
+  if (!collidesWithWalls(nx, ny, g.size)) {
+    g.x = nx; g.y = ny;
+  } else {
+    const dirs = shuffleArray([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+    for (const d of dirs) {
+      if (!collidesWithWalls(g.x + d[0] * g.speed, g.y + d[1] * g.speed, g.size)) {
+        g.dirX = d[0]; g.dirY = d[1];
+        break;
+      }
+    }
+  }
+}
+
+function updateProjectiles() {
+  projectiles = projectiles.filter((p) => {
+    p.x += p.dx * p.speed;
+    p.y += p.dy * p.speed;
+    if (collidesWithWalls(p.x, p.y, p.size)) return false;
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const dist = Math.hypot(e.x - p.x, e.y - p.y);
+      if (dist < (e.size + p.size) / 2) {
+        e.alive = false;
+        return false;
+      }
+    }
+    return p.x >= 0 && p.x <= CANVAS_W && p.y >= 0 && p.y <= CANVAS_H;
+  });
+  enemies = enemies.filter((e) => e.alive);
+}
+
+function checkPlayerEnemyCollision() {
+  if (player.invuln > 0) return;
+  for (const e of enemies) {
+    const dist = Math.hypot(e.x - player.x, e.y - player.y);
+    if (dist < (e.size + player.size) / 2 * 0.75) {
+      player.lives--;
+      player.invuln = 90;
+      if (player.lives <= 0) state = STATE.GAMEOVER;
+      break;
+    }
+  }
+}
+
+function checkHeartPickup() {
+  hearts = hearts.filter((h) => {
+    const dist = Math.hypot(h.x - player.x, h.y - player.y);
+    if (dist < maze.tileSize * 0.6) {
+      if (player.lives < player.maxLives) player.lives++;
+      return false;
+    }
+    return true;
+  });
+}
+
+function checkCastleReach() {
+  const dist = Math.hypot(castle.x - player.x, castle.y - player.y);
+  if (dist < maze.tileSize * 0.6) {
+    if (currentPhase >= MAX_PHASE) {
+      state = STATE.WIN;
+    } else {
+      currentPhase++;
+      startPhase(currentPhase);
+    }
+  }
+}
+
+function updateHUD() {
+  phaseDisplay.textContent = `Fase: ${currentPhase}/${MAX_PHASE}`;
+  livesDisplay.textContent = '❤️ ' + player.lives;
+  enemiesDisplay.textContent = `👾 ${enemies.length}`;
+}
+
+function update() {
+  updatePlayer();
+  for (const e of enemies) {
+    if (e.type === 'ghost') updateGhost(e); else updateGator(e);
+  }
+  updateProjectiles();
+  checkPlayerEnemyCollision();
+  checkHeartPickup();
+  checkCastleReach();
+  updateHUD();
+}
+
+function drawEmoji(char, x, y, size) {
+  ctx.font = `${size}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(char, x, y);
+}
+
+function draw() {
+  ctx.fillStyle = '#3a3a5e';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  const ts = maze.tileSize;
+  for (let ty = 0; ty < maze.rows; ty++) {
+    for (let tx = 0; tx < maze.cols; tx++) {
+      if (maze.grid[ty][tx] === 1) {
+        ctx.fillStyle = '#4b3a2f';
+        ctx.fillRect(tx * ts, ty * ts, ts, ts);
+        ctx.strokeStyle = '#2e2319';
+        ctx.strokeRect(tx * ts, ty * ts, ts, ts);
+      }
+    }
+  }
+
+  drawEmoji('🏰', castle.x, castle.y, ts * 1.1);
+  for (const h of hearts) drawEmoji('❤️', h.x, h.y, ts * 0.6);
+  for (const e of enemies) drawEmoji(e.type === 'ghost' ? '👻' : '🐊', e.x, e.y, e.size * 1.3);
+
+  ctx.fillStyle = '#ffe066';
+  for (const p of projectiles) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const blinking = player.invuln > 0 && Math.floor(player.invuln / 6) % 2 === 0;
+  if (!blinking) drawEmoji('👸', player.x, player.y, player.size * 1.3);
+}
+
+function drawMenu() {
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 26px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('👸 Princesa Maria Cecília 🏰', CANVAS_W / 2, 180);
+  ctx.font = '20px sans-serif';
+  ctx.fillText('e o Labirinto Encantado', CANVAS_W / 2, 220);
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = '16px sans-serif';
+  ctx.fillText('Atravesse 10 labirintos até o castelo!', CANVAS_W / 2, 280);
+  ctx.fillText('Derrote monstros com magia ✨', CANVAS_W / 2, 310);
+  
+  ctx.fillStyle = '#00ff9d';
+  ctx.font = 'bold 20px sans-serif';
+  ctx.fillText('Toque no botão START para começar', CANVAS_W / 2, 380);
+}
+
+function drawGameOver() {
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = '#ff4d4d';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('💀 Fim de Jogo 💀', CANVAS_W / 2, 260);
+  ctx.fillStyle = '#fff';
+  ctx.font = '18px sans-serif';
+  ctx.fillText(`Você chegou até a fase ${currentPhase} de ${MAX_PHASE}`, CANVAS_W / 2, 310);
+  ctx.fillStyle = '#00ff9d';
+  ctx.fillText('Toque em START para recomeçar', CANVAS_W / 2, 370);
+}
+
+function drawWin() {
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🎉 Vitória! 🎉', CANVAS_W / 2, 240);
+  ctx.fillStyle = '#fff';
+  ctx.font = '18px sans-serif';
+  ctx.fillText('A princesa venceu todas as 10 fases!', CANVAS_W / 2, 290);
+  ctx.fillStyle = '#00ff9d';
+  ctx.fillText('Toque em START para jogar novamente', CANVAS_W / 2, 350);
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  if (state === STATE.MENU) drawMenu();
+  else if (state === STATE.PLAYING) { update(); draw(); }
+  else if (state === STATE.GAMEOVER) drawGameOver();
+  else if (state === STATE.WIN) drawWin();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
